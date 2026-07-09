@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import Planner from "@/app/planner";
 import { getScenario } from "@/lib/scenario-store";
