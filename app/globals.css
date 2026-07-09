@@ -1,1 +1,101 @@
 @import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.panel {
+  border: 1px solid #d8ddd2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(32 35 31 / 0.04);
+}
+
+.button {
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 700;
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+}
+
+.button.primary {
+  background: #315f45;
+  color: #ffffff;
+}
+
+.button.secondary {
+  background: #ffffff;
+  border-color: #c7d0c0;
+  color: #24342b;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field span {
+  color: #4a5147;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.field input,
+.field select {
+  border: 1px solid #c7d0c0;
+  border-radius: 6px;
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  width: 100%;
+}
+
+.field small {
+  color: #a13b21;
+  font-size: 0.75rem;
+}
+
+.notice,
+.warning,
+.error {
+  border-radius: 8px;
+  font-size: 0.9rem;
+  padding: 0.8rem 1rem;
+}
+
+.notice {
+  background: #edf5ea;
+  color: #315f45;
+}
+
+.warning {
+  background: #fff7dc;
+  color: #725714;
+}
+
+.error {
+  background: #ffe9e1;
+  color: #8a2d17;
+}
+
+.table-head {
+  background: #eef2eb;
+  color: #4a5147;
+  font-size: 0.78rem;
+  padding: 0.9rem 1rem;
+  text-transform: uppercase;
+}

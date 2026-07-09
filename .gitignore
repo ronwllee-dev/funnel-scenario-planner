@@ -5,6 +5,8 @@ node_modules/
 .DS_Store
 *.pem
 npm-debug.log*
+.npm-cache/
+.local-scenarios.json
 .env*.local
 .env
 .vercel
