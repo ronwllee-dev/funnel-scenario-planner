@@ -7,6 +7,7 @@ create table if not exists scenarios (
   ad_budget numeric not null default 0,
   management_fee numeric not null default 0,
   cpc numeric not null default 0,
+  ctr numeric not null default 0.02,
   core_cta_action text not null default 'Booked Call',
   conv_rate_click_to_lead numeric not null default 0,
   conv_rate_lead_to_cta numeric not null default 0,
@@ -26,13 +27,13 @@ create policy "scenarios_v1_read" on scenarios for select using (true);
 drop policy if exists "scenarios_v1_write" on scenarios;
 create policy "scenarios_v1_write" on scenarios for all using (true) with check (true);
 
-insert into scenarios (id, name, currency_label, ad_budget, management_fee, cpc, core_cta_action, conv_rate_click_to_lead, conv_rate_lead_to_cta, conv_rate_cta_to_next_step, conv_rate_next_step_to_closed, average_order_value, gross_margin_pct, is_demo, computed_results, bottleneck_stage)
+insert into scenarios (id, name, currency_label, ad_budget, management_fee, cpc, ctr, core_cta_action, conv_rate_click_to_lead, conv_rate_lead_to_cta, conv_rate_cta_to_next_step, conv_rate_next_step_to_closed, average_order_value, gross_margin_pct, is_demo, computed_results, bottleneck_stage)
 values
   (
     'a1b2c3d4-0001-0001-0001-000000000001',
     'SaaS Demo Booking Campaign',
     'USD',
-    5000, 500, 1.20,
+    5000, 500, 1.20, 0.02,
     'Demo Booked',
     0.30, 0.25, 0.60, 0.40,
     2400, 0.75,
@@ -44,7 +45,7 @@ values
     'a1b2c3d4-0002-0002-0002-000000000002',
     'Local Clinic Consultation Campaign',
     'SGD',
-    3000, 300, 0.85,
+    3000, 300, 0.85, 0.025,
     'Consultation Booked',
     0.40, 0.30, 0.70, 0.50,
     800, 0.60,
@@ -56,7 +57,7 @@ values
     'a1b2c3d4-0003-0003-0003-000000000003',
     'E-commerce Flash Sale Funnel',
     'RM',
-    8000, 0, 0.55,
+    8000, 0, 0.55, 0.03,
     'Checkout Started',
     0.50, 0.20, 0.80, 0.65,
     350, 0.45,

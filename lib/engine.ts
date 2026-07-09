@@ -4,6 +4,7 @@ export type ScenarioInputs = {
   ad_budget: number;
   management_fee: number;
   cpc: number;
+  ctr: number;
   core_cta_action: string;
   conv_rate_click_to_lead: number;
   conv_rate_lead_to_cta: number;
@@ -23,11 +24,15 @@ export type ScenarioResults = {
   next_step_offers: number;
   closed_sales: number;
   revenue: number;
-  cpl: number;
-  cost_per_cta: number;
-  cost_per_next_step: number;
-  cpa: number;
-  roas: number;
+  media_cpl: number;
+  all_in_cpl: number;
+  media_cost_per_cta: number;
+  all_in_cost_per_cta: number;
+  media_cost_per_next_step: number;
+  all_in_cost_per_next_step: number;
+  media_cpa: number;
+  all_in_cpa: number;
+  media_roas: number;
   gross_profit: number;
   net_profit: number;
 };
@@ -50,7 +55,7 @@ export const DEFAULT_MULTIPLIERS: Record<ScenarioTier, number> = {
   optimistic: 1.3,
 };
 
-const IMPLIED_CTR = 0.02;
+const DEFAULT_CTR = 0.02;
 
 export function normaliseRate(value: number) {
   if (!Number.isFinite(value) || value < 0) return 0;
@@ -66,6 +71,7 @@ export function normaliseInputs(inputs: ScenarioInputs): ScenarioInputs {
     ad_budget: positive(inputs.ad_budget),
     management_fee: positive(inputs.management_fee),
     cpc: positive(inputs.cpc),
+    ctr: normaliseRate(inputs.ctr ?? DEFAULT_CTR) || DEFAULT_CTR,
     core_cta_action: inputs.core_cta_action?.trim() || "Core CTA Action",
     conv_rate_click_to_lead: normaliseRate(inputs.conv_rate_click_to_lead),
     conv_rate_lead_to_cta: normaliseRate(inputs.conv_rate_lead_to_cta),
@@ -85,7 +91,7 @@ export function calculateScenario(
   const inputs = normaliseInputs(rawInputs);
   const effectiveRate = (rate: number) => Math.min(1, rate * multiplier);
   const clicks = inputs.cpc > 0 ? inputs.ad_budget / inputs.cpc : 0;
-  const impressions = clicks / IMPLIED_CTR;
+  const impressions = inputs.ctr > 0 ? clicks / inputs.ctr : 0;
   const leads = clicks * effectiveRate(inputs.conv_rate_click_to_lead);
   const ctaActions = leads * effectiveRate(inputs.conv_rate_lead_to_cta);
   const nextStepOffers =
@@ -94,7 +100,8 @@ export function calculateScenario(
     nextStepOffers * effectiveRate(inputs.conv_rate_next_step_to_closed);
   const revenue = closedSales * inputs.average_order_value;
   const grossProfit = revenue * inputs.gross_margin_pct;
-  const netProfit = grossProfit - inputs.ad_budget - inputs.management_fee;
+  const totalCampaignCost = inputs.ad_budget + inputs.management_fee;
+  const netProfit = grossProfit - totalCampaignCost;
 
   return {
     impressions: round(impressions),
@@ -104,11 +111,15 @@ export function calculateScenario(
     next_step_offers: round(nextStepOffers),
     closed_sales: round(closedSales),
     revenue: round(revenue),
-    cpl: ratio(inputs.ad_budget, leads),
-    cost_per_cta: ratio(inputs.ad_budget, ctaActions),
-    cost_per_next_step: ratio(inputs.ad_budget, nextStepOffers),
-    cpa: ratio(inputs.ad_budget, closedSales),
-    roas: ratio(revenue, inputs.ad_budget),
+    media_cpl: ratio(inputs.ad_budget, leads),
+    all_in_cpl: ratio(totalCampaignCost, leads),
+    media_cost_per_cta: ratio(inputs.ad_budget, ctaActions),
+    all_in_cost_per_cta: ratio(totalCampaignCost, ctaActions),
+    media_cost_per_next_step: ratio(inputs.ad_budget, nextStepOffers),
+    all_in_cost_per_next_step: ratio(totalCampaignCost, nextStepOffers),
+    media_cpa: ratio(inputs.ad_budget, closedSales),
+    all_in_cpa: ratio(totalCampaignCost, closedSales),
+    media_roas: ratio(revenue, inputs.ad_budget),
     gross_profit: round(grossProfit),
     net_profit: round(netProfit),
   };
@@ -185,6 +196,7 @@ export function validateInputs(inputs: ScenarioInputs) {
   }
   if (inputs.ad_budget <= 0) errors.ad_budget = "Ad budget is required.";
   if (inputs.cpc <= 0) errors.cpc = "CPC is required.";
+  if (inputs.ctr <= 0) errors.ctr = "CTR is required.";
   if (inputs.average_order_value <= 0) {
     errors.average_order_value = "Average order value is required.";
   }
@@ -195,6 +207,7 @@ export function validateInputs(inputs: ScenarioInputs) {
     "conv_rate_cta_to_next_step",
     "conv_rate_next_step_to_closed",
     "gross_margin_pct",
+    "ctr",
   ] as const) {
     if (!Number.isFinite(inputs[key]) || inputs[key] < 0) {
       errors[key] = "Enter a rate from 0 to 100%.";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   Bottleneck,
   CalculationResponse,
@@ -8,6 +8,7 @@ import type {
   ScenarioResults,
   ScenarioTier,
 } from "@/lib/engine";
+import { calculateAll, normaliseInputs } from "@/lib/engine";
 import type { ScenarioRecord } from "@/lib/demo-scenarios";
 
 const ctaOptions = [
@@ -29,32 +30,65 @@ const tierLabels: Record<ScenarioTier, string> = {
 };
 
 const moneyRows: Array<keyof ScenarioResults> = [
-  "cpl",
-  "cost_per_cta",
-  "cost_per_next_step",
-  "cpa",
+  "media_cpl",
+  "all_in_cpl",
+  "media_cost_per_cta",
+  "all_in_cost_per_cta",
+  "media_cost_per_next_step",
+  "all_in_cost_per_next_step",
+  "media_cpa",
+  "all_in_cpa",
   "revenue",
   "gross_profit",
   "net_profit",
 ];
 
-const metricRows: Array<{
+const snapshotMetrics: Array<{
+  key: keyof ScenarioResults;
+  label: (cta: string) => string;
+}> = [
+  { key: "leads", label: () => "Projected leads" },
+  { key: "cta_actions", label: (cta) => cta },
+  { key: "closed_sales", label: () => "Closed sales" },
+  { key: "revenue", label: () => "Projected revenue" },
+  { key: "net_profit", label: () => "Net profit" },
+  { key: "media_roas", label: () => "Media ROAS" },
+];
+
+const funnelVolumeRows: Array<{
   key: keyof ScenarioResults;
   label: (cta: string) => string;
 }> = [
   { key: "impressions", label: () => "Projected impressions" },
   { key: "clicks", label: () => "Projected clicks" },
   { key: "leads", label: () => "Projected leads" },
-  { key: "cta_actions", label: (cta) => cta },
-  { key: "next_step_offers", label: () => "Next-step offers" },
-  { key: "closed_sales", label: () => "Closed sales" },
-  { key: "cpl", label: () => "Cost per lead" },
-  { key: "cost_per_cta", label: (cta) => `Cost per ${cta}` },
-  { key: "cost_per_next_step", label: () => "Cost per next-step offer" },
-  { key: "cpa", label: () => "Cost per closed sale" },
-  { key: "roas", label: () => "ROAS" },
+  { key: "cta_actions", label: (cta) => `Projected ${cta}` },
+  { key: "next_step_offers", label: () => "Projected next-step offers" },
+  { key: "closed_sales", label: () => "Projected closed sales" },
+];
+
+const commercialOutcomeRows: Array<{
+  key: keyof ScenarioResults;
+  label: (cta: string) => string;
+}> = [
+  { key: "revenue", label: () => "Projected revenue" },
+  { key: "media_roas", label: () => "Media ROAS" },
   { key: "gross_profit", label: () => "Gross profit" },
   { key: "net_profit", label: () => "Net profit" },
+];
+
+const costEfficiencyRows: Array<{
+  key: keyof ScenarioResults;
+  label: (cta: string) => string;
+}> = [
+  { key: "media_cpl", label: () => "Media cost per lead" },
+  { key: "all_in_cpl", label: () => "All-in cost per lead" },
+  { key: "media_cost_per_cta", label: (cta) => `Media cost per ${cta}` },
+  { key: "all_in_cost_per_cta", label: (cta) => `All-in cost per ${cta}` },
+  { key: "media_cost_per_next_step", label: () => "Media cost per next-step offer" },
+  { key: "all_in_cost_per_next_step", label: () => "All-in cost per next-step offer" },
+  { key: "media_cpa", label: () => "Media CPA" },
+  { key: "all_in_cpa", label: () => "All-in CPA" },
 ];
 
 type PlannerState = "loading" | "empty" | "partial" | "error" | "ready";
@@ -64,17 +98,23 @@ export default function Planner({
 }: {
   initialScenario: ScenarioRecord;
 }) {
-  const [inputs, setInputs] = useState<ScenarioInputs>(initialScenario);
-  const [calculation, setCalculation] = useState<CalculationResponse | null>(
-    null,
+  const [inputs, setInputs] = useState<ScenarioInputs>(() =>
+    normaliseInputs(initialScenario),
   );
-  const [state, setState] = useState<PlannerState>("loading");
+  const [calculation, setCalculation] = useState<CalculationResponse | null>(
+    () => calculateAll(initialScenario),
+  );
+  const [state, setState] = useState<PlannerState>("ready");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [scenarioId, setScenarioId] = useState(initialScenario.id);
+  const [origin, setOrigin] = useState("");
 
   const requiredComplete =
-    inputs.ad_budget > 0 && inputs.cpc > 0 && inputs.average_order_value > 0;
+    inputs.ad_budget > 0 &&
+    inputs.cpc > 0 &&
+    inputs.ctr > 0 &&
+    inputs.average_order_value > 0;
 
   useEffect(() => {
     if (!inputs.ad_budget && !inputs.cpc && !inputs.average_order_value) {
@@ -116,10 +156,11 @@ export default function Planner({
     return () => window.clearTimeout(timer);
   }, [inputs, requiredComplete]);
 
-  const scenarioUrl = useMemo(() => {
-    if (typeof window === "undefined" || !scenarioId) return "";
-    return `${window.location.origin}/scenario/${scenarioId}`;
-  }, [scenarioId]);
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const scenarioUrl = origin && scenarioId ? `${origin}/scenario/${scenarioId}` : "";
 
   async function saveScenario() {
     setNotice("");
@@ -169,7 +210,35 @@ export default function Planner({
           <AssumptionForm inputs={inputs} setInputs={setInputs} errors={errors} />
           <div className="space-y-5">
             <StateBanner state={state} />
-            <ResultsTable
+            <CampaignSetupSummary inputs={inputs} />
+            <ScenarioSnapshotCards
+              calculation={calculation}
+              currency={inputs.currency_label}
+              cta={inputs.core_cta_action}
+              state={state}
+            />
+            <ResultsSection
+              title="Funnel Volume"
+              description="How the audience moves from impressions through closed sales."
+              rows={funnelVolumeRows}
+              calculation={calculation}
+              currency={inputs.currency_label}
+              cta={inputs.core_cta_action}
+              state={state}
+            />
+            <ResultsSection
+              title="Commercial Outcome"
+              description="Revenue, profitability and media return from the scenario assumptions."
+              rows={commercialOutcomeRows}
+              calculation={calculation}
+              currency={inputs.currency_label}
+              cta={inputs.core_cta_action}
+              state={state}
+            />
+            <ResultsSection
+              title="Cost Efficiency"
+              description="Media-buying and all-in acquisition efficiency by funnel stage."
+              rows={costEfficiencyRows}
               calculation={calculation}
               currency={inputs.currency_label}
               cta={inputs.core_cta_action}
@@ -194,6 +263,93 @@ export default function Planner({
   );
 }
 
+function CampaignSetupSummary({ inputs }: { inputs: ScenarioInputs }) {
+  const totalCampaignCost = inputs.ad_budget + inputs.management_fee;
+  const summaryItems = [
+    { label: "Scenario name", value: inputs.name },
+    { label: "Currency label", value: inputs.currency_label },
+    { label: "Media spend / ad budget", value: money(inputs.ad_budget, inputs.currency_label) },
+    { label: "Management fee", value: money(inputs.management_fee, inputs.currency_label) },
+    { label: "Total campaign cost", value: money(totalCampaignCost, inputs.currency_label) },
+    { label: "Average order value", value: money(inputs.average_order_value, inputs.currency_label) },
+    { label: "Gross margin", value: `${asPercent(inputs.gross_margin_pct)}%` },
+    { label: "Core CTA Action", value: inputs.core_cta_action },
+  ];
+
+  return (
+    <section className="panel">
+      <SectionHeading
+        title="Campaign Setup Summary"
+        description="The assumptions a client and media buyer should align on before reading the scenarios."
+      />
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryItems.map((item) => (
+          <div className="summary-cell" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ScenarioSnapshotCards({
+  calculation,
+  currency,
+  cta,
+  state,
+}: {
+  calculation: CalculationResponse | null;
+  currency: string;
+  cta: string;
+  state: PlannerState;
+}) {
+  if (state === "loading") {
+    return <div className="panel h-44 animate-pulse bg-[#e8ebe3]" />;
+  }
+
+  if (!calculation) {
+    return (
+      <section className="panel text-sm text-[#62685e]">
+        Complete the required assumptions to see scenario snapshots.
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <SectionHeading
+        title="Scenario Snapshot"
+        description="The top-line story for conservative, expected and optimistic outcomes."
+      />
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
+          (tier) => (
+            <div className="panel snapshot-card" key={tier}>
+              <h3>{tierLabels[tier]}</h3>
+              <dl>
+                {snapshotMetrics.map((metric) => (
+                  <div key={metric.key}>
+                    <dt>{metric.label(cta)}</dt>
+                    <dd>
+                      {formatMetric(
+                        metric.key,
+                        calculation.results[tier][metric.key],
+                        currency,
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
 function AssumptionForm({
   inputs,
   setInputs,
@@ -208,6 +364,7 @@ function AssumptionForm({
       "ad_budget",
       "management_fee",
       "cpc",
+      "ctr",
       "conv_rate_click_to_lead",
       "conv_rate_lead_to_cta",
       "conv_rate_cta_to_next_step",
@@ -276,6 +433,12 @@ function AssumptionForm({
           onChange={(value) => setValue("cpc", value)}
         />
         <NumberInput
+          label="CTR %"
+          value={asPercent(inputs.ctr)}
+          error={errors.ctr}
+          onChange={(value) => setValue("ctr", value)}
+        />
+        <NumberInput
           label="Average order value"
           value={inputs.average_order_value}
           error={errors.average_order_value}
@@ -316,12 +479,21 @@ function AssumptionForm({
   );
 }
 
-function ResultsTable({
+function ResultsSection({
+  title,
+  description,
+  rows,
   calculation,
   currency,
   cta,
   state,
 }: {
+  title: string;
+  description: string;
+  rows: Array<{
+    key: keyof ScenarioResults;
+    label: (cta: string) => string;
+  }>;
   calculation: CalculationResponse | null;
   currency: string;
   cta: string;
@@ -340,7 +512,10 @@ function ResultsTable({
   }
 
   return (
-    <div className="panel overflow-hidden p-0">
+    <section className="panel overflow-hidden p-0">
+      <div className="px-4 py-4">
+        <SectionHeading title={title} description={description} />
+      </div>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -355,7 +530,7 @@ function ResultsTable({
           </tr>
         </thead>
         <tbody>
-          {metricRows.map((row) => (
+          {rows.map((row) => (
             <tr key={row.key} className="border-t border-[#e0e5da]">
               <td className="px-4 py-3 font-medium">{row.label(cta)}</td>
               {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
@@ -369,12 +544,13 @@ function ResultsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }
 
 function BottleneckCallout({
   bottleneck,
+  cta,
 }: {
   bottleneck?: Bottleneck;
   cta: string;
@@ -383,8 +559,33 @@ function BottleneckCallout({
 
   return (
     <div className="border-l-4 border-[#cf5f31] bg-[#fff4ec] px-4 py-3">
-      <p className="font-semibold text-[#7c3218]">Bottleneck insight</p>
-      <p className="mt-1 text-sm text-[#5d463a]">{bottleneck.message}</p>
+      <p className="font-semibold text-[#7c3218]">Biggest funnel bottleneck</p>
+      <p className="mt-1 text-sm text-[#5d463a]">
+        Biggest drop: {bottleneck.stage}. {bottleneck.drop_pct}% of{" "}
+        {bottleneckSource(bottleneck.stage, cta)} do not reach this step.
+      </p>
+    </div>
+  );
+}
+
+function bottleneckSource(stage: string, cta: string) {
+  if (stage.startsWith("Click")) return "clicks";
+  if (stage.startsWith("Lead")) return "leads";
+  if (stage.startsWith(cta)) return cta.toLowerCase();
+  return "next-step offers";
+}
+
+function SectionHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-1 text-sm text-[#62685e]">{description}</p>
     </div>
   );
 }
@@ -459,9 +660,13 @@ function formatMetric(
   value: number,
   currency: string,
 ) {
-  if (key === "roas") return `${value.toFixed(2)}x`;
+  if (key === "media_roas") return `${value.toFixed(2)}x`;
   if (moneyRows.includes(key)) return `${currency} ${number(value)}`;
   return number(value);
+}
+
+function money(value: number, currency: string) {
+  return `${currency} ${number(value)}`;
 }
 
 function number(value: number) {

@@ -10,6 +10,7 @@ test("calculates the formula spot-check from the PRD", () => {
     ad_budget: 5000,
     management_fee: 0,
     cpc: 1,
+    ctr: 0.02,
     core_cta_action: "Demo Booked",
     conv_rate_click_to_lead: 0.5,
     conv_rate_lead_to_cta: 0.25,
@@ -20,6 +21,7 @@ test("calculates the formula spot-check from the PRD", () => {
   });
 
   assert.equal(result.clicks, 5000);
+  assert.equal(result.impressions, 250000);
   assert.equal(result.leads, 2500);
   assert.equal(result.cta_actions, 625);
   assert.equal(result.next_step_offers, 375);
@@ -27,9 +29,11 @@ test("calculates the formula spot-check from the PRD", () => {
   assert.equal(result.revenue, 150000);
   assert.equal(result.gross_profit, 90000);
   assert.equal(result.net_profit, 85000);
-  assert.equal(result.roas, 30);
-  assert.equal(result.cpl, 2);
-  assert.equal(result.cpa, 33.33);
+  assert.equal(result.media_roas, 30);
+  assert.equal(result.media_cpl, 2);
+  assert.equal(result.all_in_cpl, 2);
+  assert.equal(result.media_cpa, 33.33);
+  assert.equal(result.all_in_cpa, 33.33);
 });
 
 test("normalises percentage-style rates", () => {
@@ -39,6 +43,7 @@ test("normalises percentage-style rates", () => {
     ad_budget: 1000,
     management_fee: 100,
     cpc: 2,
+    ctr: 2,
     core_cta_action: "Quote Request",
     conv_rate_click_to_lead: 50,
     conv_rate_lead_to_cta: 10,
@@ -49,11 +54,14 @@ test("normalises percentage-style rates", () => {
   });
 
   assert.equal(result.clicks, 500);
+  assert.equal(result.impressions, 25000);
   assert.equal(result.leads, 250);
   assert.equal(result.cta_actions, 25);
   assert.equal(result.next_step_offers, 20);
   assert.equal(result.closed_sales, 5);
   assert.equal(result.net_profit, 3900);
+  assert.equal(result.media_cpl, 4);
+  assert.equal(result.all_in_cpl, 4.4);
 });
 
 test("detects the biggest expected-stage drop with configurable CTA label", () => {
@@ -63,6 +71,7 @@ test("detects the biggest expected-stage drop with configurable CTA label", () =
     ad_budget: 2000,
     management_fee: 0,
     cpc: 1,
+    ctr: 0.02,
     core_cta_action: "Trial Started",
     conv_rate_click_to_lead: 0.9,
     conv_rate_lead_to_cta: 0.05,
