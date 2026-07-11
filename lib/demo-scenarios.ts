@@ -4,6 +4,7 @@ export type ScenarioRecord = ScenarioInputs & {
   id: string;
   created_at: string;
   is_demo: boolean;
+  user_id?: string | null;
 };
 
 export const demoScenarios: ScenarioRecord[] = [

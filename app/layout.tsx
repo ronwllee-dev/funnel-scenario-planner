@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Funnel Scenario Planner",
-  description: "No-login funnel scenario planning for consultants.",
+  description: "Private funnel scenario planning for consultants and media buyers.",
 };
 
 export default function RootLayout({

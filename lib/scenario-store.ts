@@ -1,40 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { calculateAll, type ScenarioInputs } from "@/lib/engine";
 import { demoScenarios, type ScenarioRecord } from "@/lib/demo-scenarios";
+import { createClient } from "@/lib/supabase/server";
+import { ownedScenarioFilter } from "@/lib/scenario-access";
 
-const memoryStore = new Map<string, ScenarioRecord>();
-const localStorePath = join(process.cwd(), ".local-scenarios.json");
-
-export async function listScenarios() {
-  const supabase = getSupabase();
-  if (!supabase) {
-    return [...(await readLocalScenarios()), ...demoScenarios].sort(sortNewest);
-  }
-
+export async function listScenarios(userId: string) {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("scenarios")
     .select("*")
+    .or(ownedScenarioFilter(userId))
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return data as ScenarioRecord[];
+  return normaliseScenarioRecords(data as ScenarioRecord[]);
 }
 
 export async function getScenario(id: string) {
-  const memory = memoryStore.get(id);
-  if (memory) return memory;
-
-  const demo = demoScenarios.find((scenario) => scenario.id === id);
-  if (demo) return demo;
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    const local = await readLocalScenarios();
-    return local.find((scenario) => scenario.id === id) ?? null;
-  }
-
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("scenarios")
     .select("*")
@@ -42,29 +24,18 @@ export async function getScenario(id: string) {
     .single();
 
   if (error) return null;
-  return data as ScenarioRecord;
+  return normaliseScenarioRecord(data as ScenarioRecord);
 }
 
-export async function saveScenario(inputs: ScenarioInputs) {
+export async function saveScenario(inputs: ScenarioInputs, userId: string) {
   const computed = calculateAll(inputs);
-  const supabase = getSupabase();
-
-  if (!supabase) {
-    const record: ScenarioRecord = {
-      ...computed.inputs,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-      is_demo: false,
-    };
-    memoryStore.set(record.id, record);
-    await writeLocalScenarios([record, ...(await readLocalScenarios())]);
-    return record;
-  }
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("scenarios")
     .insert({
       ...computed.inputs,
+      user_id: userId,
       scenario_multipliers: { conservative: 0.7, expected: 1, optimistic: 1.3 },
       computed_results: computed.results,
       bottleneck_stage: computed.bottleneck.stage,
@@ -74,20 +45,25 @@ export async function saveScenario(inputs: ScenarioInputs) {
     .single();
 
   if (error) throw error;
-  return data as ScenarioRecord;
+  return normaliseScenarioRecord(data as ScenarioRecord);
+}
+
+export async function updateScenarioName(id: string, name: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("scenarios")
+    .update({ name })
+    .eq("id", id)
+    .eq("is_demo", false)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return normaliseScenarioRecord(data as ScenarioRecord);
 }
 
 export async function deleteScenario(id: string) {
-  memoryStore.delete(id);
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    await writeLocalScenarios(
-      (await readLocalScenarios()).filter((scenario) => scenario.id !== id),
-    );
-    return;
-  }
-
+  const supabase = await createClient();
   const { error } = await supabase
     .from("scenarios")
     .delete()
@@ -97,30 +73,13 @@ export async function deleteScenario(id: string) {
   if (error) throw error;
 }
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !serviceRoleKey) return null;
-
-  return createClient(url, serviceRoleKey);
+function normaliseScenarioRecords(records: ScenarioRecord[]) {
+  return records.map(normaliseScenarioRecord);
 }
 
-function sortNewest(a: ScenarioRecord, b: ScenarioRecord) {
-  return Date.parse(b.created_at) - Date.parse(a.created_at);
-}
-
-async function readLocalScenarios() {
-  try {
-    const raw = await readFile(localStorePath, "utf8");
-    return JSON.parse(raw) as ScenarioRecord[];
-  } catch {
-    return [];
-  }
-}
-
-async function writeLocalScenarios(scenarios: ScenarioRecord[]) {
-  await writeFile(localStorePath, JSON.stringify(scenarios, null, 2));
+function normaliseScenarioRecord(record: ScenarioRecord) {
+  return {
+    ...record,
+    ctr: record.ctr ?? 0.02,
+  };
 }

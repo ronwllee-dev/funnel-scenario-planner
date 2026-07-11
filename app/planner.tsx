@@ -183,13 +183,11 @@ export default function Planner({
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f4] text-[#20231f]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-3 border-b border-[#d8ddd2] pb-5 md:flex-row md:items-end md:justify-between">
+    <div className="planner-page">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <header className="planner-header">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#476350]">
-              Funnel Scenario Planner
-            </p>
+            <p className="eyebrow">Funnel Scenario Planner</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal md:text-4xl">
               Stress-test funnel economics before spend goes live.
             </h1>
@@ -248,18 +246,18 @@ export default function Planner({
               bottleneck={calculation?.bottleneck}
               cta={inputs.core_cta_action}
             />
-            <p className="text-sm leading-6 text-[#62685e]">
+            <p className="disclaimer">
               Results are scenario planning assumptions based on your inputs, not
               guaranteed predictions. Currency is a display label only; no live
               conversion is applied.
             </p>
             {scenarioUrl ? (
-              <p className="text-xs text-[#747970]">Share URL: {scenarioUrl}</p>
+              <p className="text-xs text-[#879993]">Share URL: {scenarioUrl}</p>
             ) : null}
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -306,12 +304,12 @@ function ScenarioSnapshotCards({
   state: PlannerState;
 }) {
   if (state === "loading") {
-    return <div className="panel h-44 animate-pulse bg-[#e8ebe3]" />;
+    return <div className="panel h-44 animate-pulse bg-[#15262c]" />;
   }
 
   if (!calculation) {
     return (
-      <section className="panel text-sm text-[#62685e]">
+      <section className="panel text-sm text-[#adbbb5]">
         Complete the required assumptions to see scenario snapshots.
       </section>
     );
@@ -383,7 +381,7 @@ function AssumptionForm({
     <form className="panel space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Business assumptions</h2>
-        <p className="text-sm text-[#62685e]">
+        <p className="text-sm text-[#adbbb5]">
           Edit the funnel inputs and the comparison updates automatically.
         </p>
       </div>
@@ -500,12 +498,12 @@ function ResultsSection({
   state: PlannerState;
 }) {
   if (state === "loading") {
-    return <div className="panel h-96 animate-pulse bg-[#e8ebe3]" />;
+    return <div className="panel h-96 animate-pulse bg-[#15262c]" />;
   }
 
   if (!calculation) {
     return (
-      <div className="panel flex min-h-80 items-center justify-center text-center text-[#62685e]">
+      <div className="panel flex min-h-80 items-center justify-center text-center text-[#adbbb5]">
         Enter your funnel assumptions to see projections.
       </div>
     );
@@ -531,7 +529,7 @@ function ResultsSection({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-t border-[#e0e5da]">
+            <tr key={row.key} className="border-t border-[#263a41]">
               <td className="px-4 py-3 font-medium">{row.label(cta)}</td>
               {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
                 (tier) => (
@@ -558,9 +556,9 @@ function BottleneckCallout({
   if (!bottleneck) return null;
 
   return (
-    <div className="border-l-4 border-[#cf5f31] bg-[#fff4ec] px-4 py-3">
-      <p className="font-semibold text-[#7c3218]">Biggest funnel bottleneck</p>
-      <p className="mt-1 text-sm text-[#5d463a]">
+    <div className="border-l-4 border-[#f09b63] bg-[#2a1b15] px-4 py-3">
+      <p className="font-semibold text-[#ffd1b4]">Biggest funnel bottleneck</p>
+      <p className="mt-1 text-sm text-[#e0b39b]">
         Biggest drop: {bottleneck.stage}. {bottleneck.drop_pct}% of{" "}
         {bottleneckSource(bottleneck.stage, cta)} do not reach this step.
       </p>
@@ -585,7 +583,7 @@ function SectionHeading({
   return (
     <div>
       <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mt-1 text-sm text-[#62685e]">{description}</p>
+      <p className="mt-1 text-sm text-[#adbbb5]">{description}</p>
     </div>
   );
 }

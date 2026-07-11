@@ -1,31 +1,43 @@
-# Architecture — Funnel Scenario Planner
+# Architecture - Funnel Scenario Planner
 
 ## Stack
-- **Frontend:** Next.js 14 (App Router) + Tailwind CSS
-- **Database:** Supabase (Postgres + RLS)
-- **Hosting:** Vercel
-- **No AI dependencies in v1** — all computation is deterministic formula logic
 
-## What to Build Now vs Later
-| Now (v1) | Later |
-|---|---|
-| Funnel input form + scenario engine | User login + per-user scenario library |
-| Save/load scenario by URL | PDF export, client branding |
-| Bottleneck rule engine | AI narrative suggestions |
-| Demo rows seeded, no login wall | Team workspaces |
+- Frontend: Next.js App Router + Tailwind CSS
+- Auth and database: Supabase Auth, Postgres, RLS
+- Hosting: Vercel
+- No AI dependencies in V1; all computation is deterministic formula logic
 
-## Key User Action — Step by Step
-1. User lands on `/` — form pre-filled with seeded demo scenario
-2. User edits inputs (budget, CPC, rates, AOV, margin)
-3. On every change, client calls `/api/calculate` with form values
-4. API runs formula engine, returns all KPIs for all three multiplier tiers
-5. Comparison table re-renders; bottleneck rule fires and highlights the weakest stage
-6. User clicks **Save Scenario** → POST to Supabase `scenarios` table → URL updates to `/scenario/[id]`
-7. User shares URL; anyone opening it loads the same inputs and results
+## V1 Application Flow
 
-## Layer Plan
-1. **Data layer first** — schema, seed rows, RLS policies
-2. **Formula engine** — pure TypeScript functions, unit-tested, no DB dependency
-3. **API route** — thin wrapper calling formula engine, reading/writing Supabase
-4. **UI** — form + table + bottleneck callout consuming the API
-5. **Intelligence (later)** — AI narrative sits on top; removing it leaves the core intact
+1. User signs up or logs in with email and password.
+2. Supabase SSR middleware refreshes the cookie-based session.
+3. User opens the protected planner.
+4. User edits funnel assumptions, currency label, CTR, and Core CTA Action label.
+5. Client calls `/api/calculate` and renders deterministic conservative, expected, and optimistic results.
+6. User saves the scenario.
+7. API route uses the authenticated Supabase user id as `user_id`.
+8. RLS allows the owner to load, rename, and delete only their own private scenarios.
+
+## Frontend
+
+- Auth pages for login, signup, forgot password, and reset password.
+- Protected dark analytics dashboard shell.
+- Fixed left sidebar on desktop.
+- Hamburger and slide-in drawer on mobile.
+- Planner output sections: campaign summary, scenario snapshots, funnel volume, commercial outcome, cost efficiency, bottleneck insight, and disclaimer.
+
+## Backend
+
+- Next.js API routes.
+- Calculation route validates inputs and returns computed scenarios.
+- Scenario routes enforce authentication and use Supabase RLS for owner-scoped reads/writes.
+- No service-role key is used by the app for scenario access.
+
+## Non-goals
+
+- Payment checkout
+- CRM integration
+- Ad platform integration
+- Live currency conversion
+- AI-generated advice
+- AI-generated strategy report
