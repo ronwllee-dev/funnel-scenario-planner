@@ -21,6 +21,8 @@ create table if not exists scenarios (
   is_demo boolean not null default false
 );
 
+alter table scenarios add column if not exists ctr numeric not null default 0.02;
+
 alter table scenarios enable row level security;
 drop policy if exists "scenarios_v1_read" on scenarios;
 create policy "scenarios_v1_read" on scenarios for select using (true);
