@@ -48,6 +48,26 @@ export async function saveScenario(inputs: ScenarioInputs, userId: string) {
   return normaliseScenarioRecord(data as ScenarioRecord);
 }
 
+export async function updateScenario(id: string, inputs: ScenarioInputs) {
+  const computed = calculateAll(inputs);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("scenarios")
+    .update({
+      ...computed.inputs,
+      scenario_multipliers: { conservative: 0.7, expected: 1, optimistic: 1.3 },
+      computed_results: computed.results,
+      bottleneck_stage: computed.bottleneck.stage,
+    })
+    .eq("id", id)
+    .eq("is_demo", false)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return normaliseScenarioRecord(data as ScenarioRecord);
+}
+
 export async function updateScenarioName(id: string, name: string) {
   const supabase = await createClient();
   const { data, error } = await supabase

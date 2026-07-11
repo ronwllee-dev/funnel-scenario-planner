@@ -3,8 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   deleteScenario,
   getScenario,
+  updateScenario,
   updateScenarioName,
 } from "@/lib/scenario-store";
+import { validateInputs, type ScenarioInputs } from "@/lib/engine";
 
 export async function GET(
   _request: Request,
@@ -32,6 +34,20 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
+  if (typeof body.currency_label === "string") {
+    const inputs = body as ScenarioInputs;
+    const errors = validateInputs(inputs);
+    if (Object.keys(errors).length > 0) {
+      return NextResponse.json({ errors }, { status: 400 });
+    }
+
+    try {
+      return NextResponse.json({ scenario: await updateScenario(id, inputs) });
+    } catch {
+      return NextResponse.json({ error: "Scenario not found." }, { status: 404 });
+    }
+  }
+
   const name = typeof body.name === "string" ? body.name.trim() : "";
 
   if (!name) {

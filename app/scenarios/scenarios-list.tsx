@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ScenarioRecord } from "@/lib/demo-scenarios";
+import { currencyPrefix } from "@/lib/currency";
 
 export default function ScenariosList({
   scenarios,
@@ -56,7 +57,7 @@ export default function ScenariosList({
           <div>
             <h2>{scenario.name}</h2>
             <p>
-              {scenario.currency_label} {scenario.ad_budget} budget,
+              {currencyPrefix(scenario.currency_label)} {scenario.ad_budget} budget,
               {scenario.is_demo ? " demo" : " private"} scenario
             </p>
           </div>

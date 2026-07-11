@@ -33,14 +33,24 @@ export default function AppShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   return (
     <div className="app-shell">
       <button
         aria-controls="mobile-navigation"
         aria-expanded={open}
-        aria-label="Open navigation"
-        className="menu-button"
-        onClick={() => setOpen(true)}
+        aria-label={open ? "Close navigation" : "Open navigation"}
+        className={`menu-button ${open ? "is-open" : ""}`}
+        onClick={() => setOpen((current) => !current)}
         type="button"
       >
         <span />
@@ -71,7 +81,11 @@ export default function AppShell({
         >
           x
         </button>
-        <Navigation pathname={pathname} userEmail={userEmail} />
+        <Navigation
+          onNavigate={() => setOpen(false)}
+          pathname={pathname}
+          userEmail={userEmail}
+        />
       </aside>
 
       <main className="app-content">{children}</main>
@@ -80,9 +94,11 @@ export default function AppShell({
 }
 
 function Navigation({
+  onNavigate,
   pathname,
   userEmail,
 }: {
+  onNavigate?: () => void;
   pathname: string;
   userEmail: string;
 }) {
@@ -104,6 +120,7 @@ function Navigation({
               className={active ? "active" : ""}
               href={item.href}
               key={item.href}
+              onClick={onNavigate}
             >
               {item.label}
             </Link>

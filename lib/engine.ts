@@ -194,10 +194,16 @@ export function validateInputs(inputs: ScenarioInputs) {
   if (!inputs.currency_label?.trim()) {
     errors.currency_label = "Currency label is required.";
   }
-  if (inputs.ad_budget <= 0) errors.ad_budget = "Ad budget is required.";
-  if (inputs.cpc <= 0) errors.cpc = "CPC is required.";
-  if (inputs.ctr <= 0) errors.ctr = "CTR is required.";
-  if (inputs.average_order_value <= 0) {
+  if (!Number.isFinite(inputs.ad_budget) || inputs.ad_budget <= 0) {
+    errors.ad_budget = "Ad budget is required.";
+  }
+  if (!Number.isFinite(inputs.cpc) || inputs.cpc <= 0) {
+    errors.cpc = "CPC is required.";
+  }
+  if (!Number.isFinite(inputs.ctr) || inputs.ctr <= 0) {
+    errors.ctr = "CTR is required.";
+  }
+  if (!Number.isFinite(inputs.average_order_value) || inputs.average_order_value <= 0) {
     errors.average_order_value = "Average order value is required.";
   }
 

@@ -13,8 +13,8 @@ export default async function ScenariosPage() {
   return (
     <AppShell userEmail={user.email ?? "Account"}>
       <div className="mx-auto w-full max-w-5xl">
-        <div className="mb-6 flex items-end justify-between gap-3">
-          <div>
+        <div className="library-header mb-6">
+          <div className="min-w-0">
             <p className="eyebrow">Scenario library</p>
             <h1 className="text-3xl font-semibold">Saved and demo scenarios</h1>
           </div>

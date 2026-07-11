@@ -10,6 +10,11 @@ import type {
 } from "@/lib/engine";
 import { calculateAll, normaliseInputs } from "@/lib/engine";
 import type { ScenarioRecord } from "@/lib/demo-scenarios";
+import {
+  currencyPrefix,
+  isSupportedCurrency,
+  supportedCurrencies,
+} from "@/lib/currency";
 
 const ctaOptions = [
   "Booked Call",
@@ -93,6 +98,26 @@ const costEfficiencyRows: Array<{
 
 type PlannerState = "loading" | "empty" | "partial" | "error" | "ready";
 
+const cleanStarterInputs: ScenarioInputs = {
+  name: "",
+  currency_label: "SGD",
+  ad_budget: Number.NaN,
+  management_fee: Number.NaN,
+  cpc: Number.NaN,
+  ctr: Number.NaN,
+  core_cta_action: "Booked Call",
+  conv_rate_click_to_lead: Number.NaN,
+  conv_rate_lead_to_cta: Number.NaN,
+  conv_rate_cta_to_next_step: Number.NaN,
+  conv_rate_next_step_to_closed: Number.NaN,
+  average_order_value: Number.NaN,
+  gross_margin_pct: Number.NaN,
+};
+
+function comparableInputs(inputs: ScenarioInputs) {
+  return JSON.stringify(normaliseInputs(inputs));
+}
+
 export default function Planner({
   initialScenario,
 }: {
@@ -107,14 +132,24 @@ export default function Planner({
   const [state, setState] = useState<PlannerState>("ready");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
-  const [scenarioId, setScenarioId] = useState(initialScenario.id);
+  const [scenarioId, setScenarioId] = useState<string | null>(
+    initialScenario.is_demo ? null : initialScenario.id,
+  );
+  const [baseline, setBaseline] = useState(() => comparableInputs(initialScenario));
+  const [isSample, setIsSample] = useState(initialScenario.is_demo);
   const [origin, setOrigin] = useState("");
 
-  const requiredComplete =
-    inputs.ad_budget > 0 &&
-    inputs.cpc > 0 &&
-    inputs.ctr > 0 &&
-    inputs.average_order_value > 0;
+  const requiredComplete = [
+    inputs.ad_budget,
+    inputs.cpc,
+    inputs.ctr,
+    inputs.average_order_value,
+    inputs.conv_rate_click_to_lead,
+    inputs.conv_rate_lead_to_cta,
+    inputs.conv_rate_cta_to_next_step,
+    inputs.conv_rate_next_step_to_closed,
+    inputs.gross_margin_pct,
+  ].every((value) => Number.isFinite(value) && value > 0);
 
   useEffect(() => {
     if (!inputs.ad_budget && !inputs.cpc && !inputs.average_order_value) {
@@ -161,22 +196,47 @@ export default function Planner({
   }, []);
 
   const scenarioUrl = origin && scenarioId ? `${origin}/scenario/${scenarioId}` : "";
+  const hasUnsavedChanges = comparableInputs(inputs) !== baseline;
+
+  function startNewScenario() {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("Start a new scenario? Your unsaved changes will be cleared.")
+    ) {
+      return;
+    }
+
+    setInputs(cleanStarterInputs);
+    setScenarioId(null);
+    setIsSample(false);
+    setBaseline(comparableInputs(cleanStarterInputs));
+    setErrors({});
+    setNotice("");
+    setCalculation(null);
+    setState("empty");
+    window.history.replaceState(null, "", "/");
+  }
 
   async function saveScenario() {
     setNotice("");
     try {
-      const response = await fetch("/api/scenarios", {
-        method: "POST",
+      const response = await fetch(
+        scenarioId ? `/api/scenarios/${scenarioId}` : "/api/scenarios",
+        {
+        method: scenarioId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(inputs),
-      });
+        },
+      );
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error ?? "Save failed");
 
       setScenarioId(data.scenario.id);
+      setIsSample(false);
+      setBaseline(comparableInputs(data.scenario));
       window.history.replaceState(null, "", `/scenario/${data.scenario.id}`);
-      setNotice("Scenario saved. This URL can be shared.");
+      setNotice(scenarioId ? "Scenario changes saved." : "Scenario saved. This URL can be shared.");
     } catch {
       setNotice("Save failed. Please try again.");
     }
@@ -186,27 +246,34 @@ export default function Planner({
     <div className="planner-page">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <header className="planner-header">
-          <div>
+          <div className="min-w-0">
             <p className="eyebrow">Funnel Scenario Planner</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal md:text-4xl">
               Stress-test funnel economics before spend goes live.
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <a className="button secondary" href="/scenarios">
-              Saved scenarios
-            </a>
+          <div className="planner-actions">
+            <button className="button secondary" onClick={startNewScenario} type="button">
+              New Scenario
+            </button>
             <button className="button primary" onClick={saveScenario}>
-              Save scenario
+              {scenarioId ? "Save Changes" : "Save Scenario"}
             </button>
           </div>
         </header>
 
+        {isSample ? (
+          <div className="sample-note">
+            <strong>Sample Scenario</strong>
+            <span>Example values are provided to demonstrate how the planner works.</span>
+          </div>
+        ) : null}
+
         {notice ? <div className="notice">{notice}</div> : null}
 
-        <section className="grid gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+        <section className="planner-grid">
           <AssumptionForm inputs={inputs} setInputs={setInputs} errors={errors} />
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             <StateBanner state={state} />
             <CampaignSetupSummary inputs={inputs} />
             <ScenarioSnapshotCards
@@ -252,7 +319,7 @@ export default function Planner({
               conversion is applied.
             </p>
             {scenarioUrl ? (
-              <p className="text-xs text-[#879993]">Share URL: {scenarioUrl}</p>
+              <p className="share-url text-xs text-[#879993]">Share URL: {scenarioUrl}</p>
             ) : null}
           </div>
         </section>
@@ -262,10 +329,12 @@ export default function Planner({
 }
 
 function CampaignSetupSummary({ inputs }: { inputs: ScenarioInputs }) {
-  const totalCampaignCost = inputs.ad_budget + inputs.management_fee;
+  const totalCampaignCost =
+    inputs.ad_budget +
+    (Number.isFinite(inputs.management_fee) ? inputs.management_fee : 0);
   const summaryItems = [
     { label: "Scenario name", value: inputs.name },
-    { label: "Currency label", value: inputs.currency_label },
+    { label: "Currency", value: inputs.currency_label },
     { label: "Media spend / ad budget", value: money(inputs.ad_budget, inputs.currency_label) },
     { label: "Management fee", value: money(inputs.management_fee, inputs.currency_label) },
     { label: "Total campaign cost", value: money(totalCampaignCost, inputs.currency_label) },
@@ -373,7 +442,11 @@ function AssumptionForm({
 
     setInputs({
       ...inputs,
-      [key]: numericFields.has(key) ? Number(value) : value,
+      [key]: numericFields.has(key)
+        ? value === ""
+          ? Number.NaN
+          : Number(value)
+        : value,
     });
   }
 
@@ -392,13 +465,26 @@ function AssumptionForm({
         error={errors.name}
         onChange={(value) => setValue("name", value)}
       />
-      <div className="grid grid-cols-2 gap-3">
-        <TextInput
-          label="Currency label"
-          value={inputs.currency_label}
-          error={errors.currency_label}
-          onChange={(value) => setValue("currency_label", value)}
-        />
+      <div className="form-grid">
+        <label className="field">
+          <span>Currency</span>
+          <select
+            value={inputs.currency_label}
+            onChange={(event) => setValue("currency_label", event.target.value)}
+          >
+            {isSupportedCurrency(inputs.currency_label) ? null : (
+              <option value={inputs.currency_label}>
+                Legacy: {inputs.currency_label}
+              </option>
+            )}
+            {supportedCurrencies.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency} ({currencyPrefix(currency)})
+              </option>
+            ))}
+          </select>
+          {errors.currency_label ? <small>{errors.currency_label}</small> : null}
+        </label>
         <label className="field">
           <span>Core CTA Action</span>
           <select
@@ -412,57 +498,66 @@ function AssumptionForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="form-grid">
         <NumberInput
           label="Ad budget"
           value={inputs.ad_budget}
+          placeholder="e.g. 5000"
           error={errors.ad_budget}
           onChange={(value) => setValue("ad_budget", value)}
         />
         <NumberInput
           label="Management fee"
           value={inputs.management_fee}
+          placeholder="e.g. 500"
           onChange={(value) => setValue("management_fee", value)}
         />
         <NumberInput
           label="CPC"
           value={inputs.cpc}
+          placeholder="e.g. 2.50"
           error={errors.cpc}
           onChange={(value) => setValue("cpc", value)}
         />
         <NumberInput
           label="CTR %"
           value={asPercent(inputs.ctr)}
+          placeholder="e.g. 2"
           error={errors.ctr}
           onChange={(value) => setValue("ctr", value)}
         />
         <NumberInput
           label="Average order value"
           value={inputs.average_order_value}
+          placeholder="e.g. 3000"
           error={errors.average_order_value}
           onChange={(value) => setValue("average_order_value", value)}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="form-grid">
         <NumberInput
           label="Click to lead %"
           value={asPercent(inputs.conv_rate_click_to_lead)}
+          placeholder="e.g. 30"
           onChange={(value) => setValue("conv_rate_click_to_lead", value)}
         />
         <NumberInput
           label={`Lead to ${inputs.core_cta_action} %`}
           value={asPercent(inputs.conv_rate_lead_to_cta)}
+          placeholder="e.g. 25"
           onChange={(value) => setValue("conv_rate_lead_to_cta", value)}
         />
         <NumberInput
           label="CTA to next-step %"
           value={asPercent(inputs.conv_rate_cta_to_next_step)}
+          placeholder="e.g. 60"
           onChange={(value) => setValue("conv_rate_cta_to_next_step", value)}
         />
         <NumberInput
           label="Next-step to closed %"
           value={asPercent(inputs.conv_rate_next_step_to_closed)}
+          placeholder="e.g. 40"
           onChange={(value) =>
             setValue("conv_rate_next_step_to_closed", value)
           }
@@ -470,6 +565,7 @@ function AssumptionForm({
         <NumberInput
           label="Gross margin %"
           value={asPercent(inputs.gross_margin_pct)}
+          placeholder="e.g. 75"
           onChange={(value) => setValue("gross_margin_pct", value)}
         />
       </div>
@@ -510,10 +606,11 @@ function ResultsSection({
   }
 
   return (
-    <section className="panel overflow-hidden p-0">
+    <section className="panel results-panel p-0">
       <div className="px-4 py-4">
         <SectionHeading title={title} description={description} />
       </div>
+      <p className="table-swipe-note">Swipe horizontally to compare all scenarios.</p>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -627,11 +724,13 @@ function NumberInput({
   label,
   value,
   error,
+  placeholder,
   onChange,
 }: {
   label: string;
   value: number;
   error?: string;
+  placeholder?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -642,6 +741,7 @@ function NumberInput({
         step="0.01"
         type="number"
         value={Number.isFinite(value) ? value : ""}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
       {error ? <small>{error}</small> : null}
@@ -659,12 +759,13 @@ function formatMetric(
   currency: string,
 ) {
   if (key === "media_roas") return `${value.toFixed(2)}x`;
-  if (moneyRows.includes(key)) return `${currency} ${number(value)}`;
+  if (moneyRows.includes(key)) return `${currencyPrefix(currency)} ${number(value)}`;
   return number(value);
 }
 
 function money(value: number, currency: string) {
-  return `${currency} ${number(value)}`;
+  if (!Number.isFinite(value)) return "—";
+  return `${currencyPrefix(currency)} ${number(value)}`;
 }
 
 function number(value: number) {
