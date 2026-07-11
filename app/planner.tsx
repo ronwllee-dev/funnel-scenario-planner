@@ -611,34 +611,36 @@ function ResultsSection({
         <SectionHeading title={title} description={description} />
       </div>
       <p className="table-swipe-note">Swipe horizontally to compare all scenarios.</p>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            <th className="table-head text-left">KPI</th>
-            {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
-              (tier) => (
-                <th className="table-head text-right" key={tier}>
-                  {tierLabels[tier]}
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-t border-[#263a41]">
-              <td className="px-4 py-3 font-medium">{row.label(cta)}</td>
+      <div className="table-scroll-wrapper">
+        <table className="comparison-table w-full text-sm">
+          <thead>
+            <tr>
+              <th className="table-head text-left">KPI</th>
               {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
                 (tier) => (
-                  <td className="px-4 py-3 text-right" key={tier}>
-                    {formatMetric(row.key, calculation.results[tier][row.key], currency)}
-                  </td>
+                  <th className="table-head text-right" key={tier}>
+                    {tierLabels[tier]}
+                  </th>
                 ),
               )}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="px-4 py-3 font-medium">{row.label(cta)}</td>
+                {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
+                  (tier) => (
+                    <td className="px-4 py-3 text-right" key={tier}>
+                      {formatMetric(row.key, calculation.results[tier][row.key], currency)}
+                    </td>
+                  ),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

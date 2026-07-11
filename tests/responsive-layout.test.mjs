@@ -25,9 +25,13 @@ test("dark responsive CSS prevents mobile overflow and keeps controls touch frie
   assert.match(css, /background: #071014/);
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/s);
   assert.match(css, /\.planner-grid\s*\{[^}]*min-width:\s*0/s);
-  assert.match(css, /\.results-panel\s*\{[^}]*overflow-x:\s*auto/s);
-  assert.match(css, /\.results-panel th:first-child,[\s\S]*position:\s*sticky/);
-  assert.match(css, /\.results-panel td:first-child\s*\{[^}]*background:\s*#0f1d22/s);
+  assert.match(css, /\.results-panel\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.table-scroll-wrapper\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /\.table-scroll-wrapper\s*\{[^}]*padding:\s*0/s);
+  assert.match(css, /\.comparison-table\s*\{[^}]*border-collapse:\s*separate/s);
+  assert.match(css, /\.comparison-table th:first-child,[\s\S]*left:\s*0/);
+  assert.match(css, /\.comparison-table th:first-child,[\s\S]*position:\s*sticky/);
+  assert.match(css, /\.comparison-table td:first-child\s*\{[^}]*background:\s*#0f1d22/s);
   assert.match(css, /\.table-swipe-note\s*\{[^}]*display:\s*none/s);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*\.table-swipe-note\s*\{[^}]*display:\s*block/s);
   assert.match(css, /\.form-grid\s*\{[\s\S]*@media \(min-width: 768px\)/);
@@ -43,6 +47,7 @@ test("comparison tables explain mobile scrolling and keep KPI labels visible", a
 
   assert.match(planner, /Swipe horizontally to compare all scenarios\./);
   assert.match(planner, /className="panel results-panel p-0"/);
+  assert.match(planner, /className="table-scroll-wrapper"[\s\S]*<table className="comparison-table/);
 });
 
 test("planner separates sample, new, create, and update scenario states", async () => {
