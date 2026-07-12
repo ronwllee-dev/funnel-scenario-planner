@@ -8,13 +8,23 @@ import type {
   ScenarioResults,
   ScenarioTier,
 } from "@/lib/engine";
-import { calculateAll, normaliseInputs } from "@/lib/engine";
+import {
+  calculateAll,
+  normaliseInputs,
+} from "@/lib/engine";
 import type { ScenarioRecord } from "@/lib/demo-scenarios";
 import {
   currencyPrefix,
   isSupportedCurrency,
   supportedCurrencies,
 } from "@/lib/currency";
+import {
+  assumptionBases,
+  campaignChannels,
+  getModelStatus,
+  localDate,
+  modelStatusCopy,
+} from "@/lib/scenario-metadata";
 
 const ctaOptions = [
   "Booked Call",
@@ -32,6 +42,24 @@ const tierLabels: Record<ScenarioTier, string> = {
   conservative: "Conservative",
   expected: "Expected",
   optimistic: "Optimistic",
+};
+
+const scenarioDescriptions: Record<
+  ScenarioTier,
+  { rateDescription: string; explanation: string }
+> = {
+  conservative: {
+    rateDescription: "85% of entered rates",
+    explanation: "15% lower than your baseline assumptions",
+  },
+  expected: {
+    rateDescription: "100% of entered rates",
+    explanation: "Uses your baseline assumptions as entered",
+  },
+  optimistic: {
+    rateDescription: "115% of entered rates",
+    explanation: "15% higher than your baseline assumptions",
+  },
 };
 
 const moneyRows: Array<keyof ScenarioResults> = [
@@ -98,7 +126,8 @@ const costEfficiencyRows: Array<{
 
 type PlannerState = "loading" | "empty" | "partial" | "error" | "ready";
 
-const cleanStarterInputs: ScenarioInputs = {
+function cleanStarterInputs(): ScenarioInputs {
+  return {
   name: "",
   currency_label: "SGD",
   ad_budget: Number.NaN,
@@ -112,7 +141,13 @@ const cleanStarterInputs: ScenarioInputs = {
   conv_rate_next_step_to_closed: Number.NaN,
   average_order_value: Number.NaN,
   gross_margin_pct: Number.NaN,
-};
+  campaign_channel: "Mixed channels",
+  target_market: "",
+  assumption_basis: "Consultant assumption",
+  assumption_date: localDate(),
+  assumption_notes: "",
+  };
+}
 
 function comparableInputs(inputs: ScenarioInputs) {
   return JSON.stringify(normaliseInputs(inputs));
@@ -206,10 +241,11 @@ export default function Planner({
       return;
     }
 
-    setInputs(cleanStarterInputs);
+    const starterInputs = cleanStarterInputs();
+    setInputs(starterInputs);
     setScenarioId(null);
     setIsSample(false);
-    setBaseline(comparableInputs(cleanStarterInputs));
+    setBaseline(comparableInputs(starterInputs));
     setErrors({});
     setNotice("");
     setCalculation(null);
@@ -276,6 +312,8 @@ export default function Planner({
           <div className="min-w-0 space-y-5">
             <StateBanner state={state} />
             <CampaignSetupSummary inputs={inputs} />
+            <ModelStatusCard assumptionBasis={inputs.assumption_basis} />
+            <ScenarioMethodology />
             <ScenarioSnapshotCards
               calculation={calculation}
               currency={inputs.currency_label}
@@ -313,11 +351,19 @@ export default function Planner({
               bottleneck={calculation?.bottleneck}
               cta={inputs.core_cta_action}
             />
-            <p className="disclaimer">
-              Results are scenario planning assumptions based on your inputs, not
-              guaranteed predictions. Currency is a display label only; no live
-              conversion is applied.
-            </p>
+            <section className="panel disclaimer">
+              <h2>Forecast and planning disclaimer</h2>
+              <p>
+                This model provides scenario-based projections using the assumptions
+                entered. The calculations are intended for business planning and do not
+                guarantee advertising, lead, sales, revenue or profit outcomes. Actual
+                performance may vary due to platform auctions, audience quality,
+                competition, offer strength, creative performance, seasonality,
+                tracking, lead quality, follow-up speed, sales execution and other
+                market conditions. Update the model with actual advertising, CRM and
+                sales data as results become available.
+              </p>
+            </section>
             {scenarioUrl ? (
               <p className="share-url text-xs text-[#879993]">Share URL: {scenarioUrl}</p>
             ) : null}
@@ -332,7 +378,7 @@ function CampaignSetupSummary({ inputs }: { inputs: ScenarioInputs }) {
   const totalCampaignCost =
     inputs.ad_budget +
     (Number.isFinite(inputs.management_fee) ? inputs.management_fee : 0);
-  const summaryItems = [
+  const summaryItems: Array<{ label: string; value: string; wide?: boolean }> = [
     { label: "Scenario name", value: inputs.name },
     { label: "Currency", value: inputs.currency_label },
     { label: "Media spend / ad budget", value: money(inputs.ad_budget, inputs.currency_label) },
@@ -341,7 +387,16 @@ function CampaignSetupSummary({ inputs }: { inputs: ScenarioInputs }) {
     { label: "Average order value", value: money(inputs.average_order_value, inputs.currency_label) },
     { label: "Gross margin", value: `${asPercent(inputs.gross_margin_pct)}%` },
     { label: "Core CTA Action", value: inputs.core_cta_action },
+    { label: "Campaign channel", value: inputs.campaign_channel },
+    { label: "Target market", value: inputs.target_market || "Not specified" },
+    { label: "Assumption basis", value: inputs.assumption_basis },
+    { label: "Assumption date", value: inputs.assumption_date || "Not specified" },
+    { label: "Scenario sensitivity", value: "85% / 100% / 115%" },
   ];
+
+  if (inputs.assumption_notes) {
+    summaryItems.push({ label: "Assumption notes", value: inputs.assumption_notes, wide: true });
+  }
 
   return (
     <section className="panel">
@@ -351,11 +406,43 @@ function CampaignSetupSummary({ inputs }: { inputs: ScenarioInputs }) {
       />
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {summaryItems.map((item) => (
-          <div className="summary-cell" key={item.label}>
+          <div className={`summary-cell ${item.wide ? "summary-cell-wide" : ""}`} key={item.label}>
             <span>{item.label}</span>
             <strong>{item.value}</strong>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function ModelStatusCard({ assumptionBasis }: { assumptionBasis: string }) {
+  const status = getModelStatus(assumptionBasis);
+  return (
+    <section className="panel model-status-card">
+      <p className="eyebrow">Forecast confidence</p>
+      <h2>Model status: {status}</h2>
+      <p>{modelStatusCopy[status]}</p>
+    </section>
+  );
+}
+
+function ScenarioMethodology() {
+  const tiers: ScenarioTier[] = ["conservative", "expected", "optimistic"];
+  return (
+    <section className="panel results-panel p-0">
+      <div className="px-4 py-4">
+        <SectionHeading
+          title="Scenario Methodology"
+          description="All scenarios use the same ad budget, CPC, CTR, average order value, gross margin and management fee. Conservative and Optimistic outcomes are created by adjusting each entered funnel conversion rate to 85% and 115% respectively. These are planning sensitivities, not industry benchmarks or guaranteed forecasts."
+        />
+      </div>
+      <p className="table-swipe-note">Swipe horizontally to compare scenario methodology.</p>
+      <div className="table-scroll-wrapper">
+        <table className="comparison-table methodology-table w-full text-sm">
+          <thead><tr><th className="table-head text-left">Scenario</th><th className="table-head text-left">Sensitivity</th><th className="table-head text-left">Planning use</th></tr></thead>
+          <tbody>{tiers.map((tier) => <tr key={tier}><td className="px-4 py-3 font-medium">{tierLabels[tier]}</td><td className="px-4 py-3">{scenarioDescriptions[tier].rateDescription}</td><td className="px-4 py-3">{scenarioDescriptions[tier].explanation}</td></tr>)}</tbody>
+        </table>
       </div>
     </section>
   );
@@ -390,11 +477,29 @@ function ScenarioSnapshotCards({
         title="Scenario Snapshot"
         description="The top-line story for conservative, expected and optimistic outcomes."
       />
+      <p className="scenario-projection-note">
+        Scenario outputs are planning projections, not guaranteed results.
+      </p>
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         {(["conservative", "expected", "optimistic"] as ScenarioTier[]).map(
           (tier) => (
             <div className="panel snapshot-card" key={tier}>
               <h3>{tierLabels[tier]}</h3>
+              <p className="snapshot-sensitivity">
+                {scenarioDescriptions[tier].rateDescription}
+              </p>
+              <p className="snapshot-explanation">
+                {scenarioDescriptions[tier].explanation}
+              </p>
+              <details className="adjusted-rates">
+                <summary>Adjusted conversion rates</summary>
+                <dl>
+                  <div><dt>Click to Lead</dt><dd>{asPercent(calculation.adjusted_rates[tier].click_to_lead)}%</dd></div>
+                  <div><dt>Lead to {cta}</dt><dd>{asPercent(calculation.adjusted_rates[tier].lead_to_cta)}%</dd></div>
+                  <div><dt>{cta} to Next Step</dt><dd>{asPercent(calculation.adjusted_rates[tier].cta_to_next_step)}%</dd></div>
+                  <div><dt>Next Step to Closed</dt><dd>{asPercent(calculation.adjusted_rates[tier].next_step_to_closed)}%</dd></div>
+                </dl>
+              </details>
               <dl>
                 {snapshotMetrics.map((metric) => (
                   <div key={metric.key}>
@@ -452,123 +557,69 @@ function AssumptionForm({
 
   return (
     <form className="panel space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Business assumptions</h2>
-        <p className="text-sm text-[#adbbb5]">
-          Edit the funnel inputs and the comparison updates automatically.
-        </p>
-      </div>
-
-      <TextInput
-        label="Scenario name"
-        value={inputs.name}
-        error={errors.name}
-        onChange={(value) => setValue("name", value)}
-      />
-      <div className="form-grid">
+      <section className="assumption-section">
+        <div>
+          <h2>Scenario context</h2>
+          <p>Describe the campaign, target market and basis of this forecast.</p>
+        </div>
+        <TextInput label="Scenario name" value={inputs.name} error={errors.name} onChange={(value) => setValue("name", value)} />
+        <div className="form-grid">
+          <label className="field">
+            <span>Campaign channel</span>
+            <select value={inputs.campaign_channel} onChange={(event) => setValue("campaign_channel", event.target.value)}>
+              {campaignChannels.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+          <TextInput label="Target market" value={inputs.target_market} placeholder="Singapore SMEs" onChange={(value) => setValue("target_market", value)} />
+          <label className="field">
+            <span>Assumption basis</span>
+            <select value={inputs.assumption_basis} onChange={(event) => setValue("assumption_basis", event.target.value)}>
+              {assumptionBases.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Assumption date</span>
+            <input type="date" value={inputs.assumption_date} onChange={(event) => setValue("assumption_date", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Core CTA Action</span>
+            <select value={inputs.core_cta_action} onChange={(event) => setValue("core_cta_action", event.target.value)}>
+              {ctaOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+        </div>
         <label className="field">
-          <span>Currency</span>
-          <select
-            value={inputs.currency_label}
-            onChange={(event) => setValue("currency_label", event.target.value)}
-          >
-            {isSupportedCurrency(inputs.currency_label) ? null : (
-              <option value={inputs.currency_label}>
-                Legacy: {inputs.currency_label}
-              </option>
-            )}
-            {supportedCurrencies.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency} ({currencyPrefix(currency)})
-              </option>
-            ))}
-          </select>
-          {errors.currency_label ? <small>{errors.currency_label}</small> : null}
+          <span>Assumption notes (optional)</span>
+          <textarea value={inputs.assumption_notes} placeholder="CPC estimate provided by media buyer. Conversion rates based partly on the client’s historical sales process." onChange={(event) => setValue("assumption_notes", event.target.value)} />
         </label>
-        <label className="field">
-          <span>Core CTA Action</span>
-          <select
-            value={inputs.core_cta_action}
-            onChange={(event) => setValue("core_cta_action", event.target.value)}
-          >
-            {ctaOptions.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      </section>
 
-      <div className="form-grid">
-        <NumberInput
-          label="Ad budget"
-          value={inputs.ad_budget}
-          placeholder="e.g. 5000"
-          error={errors.ad_budget}
-          onChange={(value) => setValue("ad_budget", value)}
-        />
-        <NumberInput
-          label="Management fee"
-          value={inputs.management_fee}
-          placeholder="e.g. 500"
-          onChange={(value) => setValue("management_fee", value)}
-        />
-        <NumberInput
-          label="CPC"
-          value={inputs.cpc}
-          placeholder="e.g. 2.50"
-          error={errors.cpc}
-          onChange={(value) => setValue("cpc", value)}
-        />
-        <NumberInput
-          label="CTR %"
-          value={asPercent(inputs.ctr)}
-          placeholder="e.g. 2"
-          error={errors.ctr}
-          onChange={(value) => setValue("ctr", value)}
-        />
-        <NumberInput
-          label="Average order value"
-          value={inputs.average_order_value}
-          placeholder="e.g. 3000"
-          error={errors.average_order_value}
-          onChange={(value) => setValue("average_order_value", value)}
-        />
-      </div>
-
-      <div className="form-grid">
-        <NumberInput
-          label="Click to lead %"
-          value={asPercent(inputs.conv_rate_click_to_lead)}
-          placeholder="e.g. 30"
-          onChange={(value) => setValue("conv_rate_click_to_lead", value)}
-        />
-        <NumberInput
-          label={`Lead to ${inputs.core_cta_action} %`}
-          value={asPercent(inputs.conv_rate_lead_to_cta)}
-          placeholder="e.g. 25"
-          onChange={(value) => setValue("conv_rate_lead_to_cta", value)}
-        />
-        <NumberInput
-          label="CTA to next-step %"
-          value={asPercent(inputs.conv_rate_cta_to_next_step)}
-          placeholder="e.g. 60"
-          onChange={(value) => setValue("conv_rate_cta_to_next_step", value)}
-        />
-        <NumberInput
-          label="Next-step to closed %"
-          value={asPercent(inputs.conv_rate_next_step_to_closed)}
-          placeholder="e.g. 40"
-          onChange={(value) =>
-            setValue("conv_rate_next_step_to_closed", value)
-          }
-        />
-        <NumberInput
-          label="Gross margin %"
-          value={asPercent(inputs.gross_margin_pct)}
-          placeholder="e.g. 75"
-          onChange={(value) => setValue("gross_margin_pct", value)}
-        />
-      </div>
+      <section className="assumption-section forecast-assumption-section">
+        <div>
+          <h2>Forecast assumptions</h2>
+          <p>Enter the financial and conversion assumptions used to calculate the scenarios.</p>
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span>Currency</span>
+            <select value={inputs.currency_label} onChange={(event) => setValue("currency_label", event.target.value)}>
+              {isSupportedCurrency(inputs.currency_label) ? null : <option value={inputs.currency_label}>Legacy: {inputs.currency_label}</option>}
+              {supportedCurrencies.map((currency) => <option key={currency} value={currency}>{currency} ({currencyPrefix(currency)})</option>)}
+            </select>
+            {errors.currency_label ? <small>{errors.currency_label}</small> : null}
+          </label>
+          <NumberInput label="Ad budget" value={inputs.ad_budget} placeholder="e.g. 5000" error={errors.ad_budget} onChange={(value) => setValue("ad_budget", value)} />
+          <NumberInput label="Management fee" value={inputs.management_fee} placeholder="e.g. 500" onChange={(value) => setValue("management_fee", value)} />
+          <NumberInput label="CPC" value={inputs.cpc} placeholder="e.g. 2.50" error={errors.cpc} onChange={(value) => setValue("cpc", value)} />
+          <NumberInput label="CTR %" value={asPercent(inputs.ctr)} placeholder="e.g. 2" error={errors.ctr} onChange={(value) => setValue("ctr", value)} />
+          <NumberInput label="Average order value" value={inputs.average_order_value} placeholder="e.g. 3000" error={errors.average_order_value} onChange={(value) => setValue("average_order_value", value)} />
+          <NumberInput label="Gross margin %" value={asPercent(inputs.gross_margin_pct)} placeholder="e.g. 75" onChange={(value) => setValue("gross_margin_pct", value)} />
+          <NumberInput label="Click-to-lead %" value={asPercent(inputs.conv_rate_click_to_lead)} placeholder="e.g. 30" onChange={(value) => setValue("conv_rate_click_to_lead", value)} />
+          <NumberInput label={`Lead to ${inputs.core_cta_action} %`} value={asPercent(inputs.conv_rate_lead_to_cta)} placeholder="e.g. 25" onChange={(value) => setValue("conv_rate_lead_to_cta", value)} />
+          <NumberInput label={`${inputs.core_cta_action} to next-step %`} value={asPercent(inputs.conv_rate_cta_to_next_step)} placeholder="e.g. 60" onChange={(value) => setValue("conv_rate_cta_to_next_step", value)} />
+          <NumberInput label="Next-step to sale %" value={asPercent(inputs.conv_rate_next_step_to_closed)} placeholder="e.g. 40" onChange={(value) => setValue("conv_rate_next_step_to_closed", value)} />
+        </div>
+      </section>
     </form>
   );
 }
@@ -706,17 +757,19 @@ function TextInput({
   label,
   value,
   error,
+  placeholder,
   onChange,
 }: {
   label: string;
   value: string;
   error?: string;
+  placeholder?: string;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
       {error ? <small>{error}</small> : null}
     </label>
   );

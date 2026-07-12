@@ -77,3 +77,37 @@ test("new scenarios start blank and currencies use controlled display prefixes",
   assert.match(currency, /SGD: "S\$"/);
   assert.match(currency, /MYR: "RM"/);
 });
+
+test("forecast transparency and context UI remain responsive", async () => {
+  const planner = await text("app/planner.tsx");
+  const css = await text("app/globals.css");
+  assert.match(planner, /Scenario Methodology/);
+  assert.match(planner, /85% of entered rates/);
+  assert.match(planner, /15% lower than your baseline assumptions/);
+  assert.match(planner, /100% of entered rates/);
+  assert.match(planner, /Uses your baseline assumptions as entered/);
+  assert.match(planner, /115% of entered rates/);
+  assert.match(planner, /15% higher than your baseline assumptions/);
+  assert.match(planner, /Adjusted conversion rates/);
+  assert.match(planner, /Campaign channel/);
+  assert.match(planner, /Assumption basis/);
+  assert.match(planner, /type="date"/);
+  assert.match(planner, /Assumption notes \(optional\)/);
+  assert.match(planner, /Forecast and planning disclaimer/);
+  assert.match(planner, /methodology-table/);
+  assert.match(css, /\.field textarea/);
+  assert.match(css, /\.summary-cell-wide/);
+});
+
+test("business assumptions are separated into context and forecast sections", async () => {
+  const planner = await text("app/planner.tsx");
+  const css = await text("app/globals.css");
+  assert.match(planner, /<h2>Scenario context<\/h2>/);
+  assert.match(planner, /Describe the campaign, target market and basis of this forecast\./);
+  assert.match(planner, /<h2>Forecast assumptions<\/h2>/);
+  assert.match(planner, /Enter the financial and conversion assumptions used to calculate the scenarios\./);
+  assert.doesNotMatch(planner, /Used to describe the source of the media assumptions/);
+  assert.match(planner, /label=\{`Lead to \$\{inputs\.core_cta_action\} %`\}/);
+  assert.match(planner, /label=\{`\$\{inputs\.core_cta_action\} to next-step %`\}/);
+  assert.match(css, /\.assumption-section \+ \.assumption-section/);
+});

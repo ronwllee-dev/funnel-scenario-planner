@@ -24,3 +24,13 @@ test("ownership migration replaces open V1 policies with RLS owner policies", as
   );
   assert.match(migration, /add column if not exists ctr numeric not null default 0\.02/);
 });
+
+test("context migration leaves ownership policies unchanged", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/0003_scenario_context.sql", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(migration, /create policy|drop policy|disable row level security/);
+  assert.match(migration, /conservative.*0\.85/);
+  assert.match(migration, /optimistic.*1\.15/);
+});

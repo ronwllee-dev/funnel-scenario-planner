@@ -12,6 +12,11 @@ export type ScenarioInputs = {
   conv_rate_next_step_to_closed: number;
   average_order_value: number;
   gross_margin_pct: number;
+  campaign_channel: string;
+  target_market: string;
+  assumption_basis: string;
+  assumption_date: string;
+  assumption_notes: string;
 };
 
 export type ScenarioTier = "conservative" | "expected" | "optimistic";
@@ -47,12 +52,20 @@ export type CalculationResponse = {
   inputs: ScenarioInputs;
   results: Record<ScenarioTier, ScenarioResults>;
   bottleneck: Bottleneck;
+  adjusted_rates: Record<ScenarioTier, AdjustedConversionRates>;
+};
+
+export type AdjustedConversionRates = {
+  click_to_lead: number;
+  lead_to_cta: number;
+  cta_to_next_step: number;
+  next_step_to_closed: number;
 };
 
 export const DEFAULT_MULTIPLIERS: Record<ScenarioTier, number> = {
-  conservative: 0.7,
+  conservative: 0.85,
   expected: 1,
-  optimistic: 1.3,
+  optimistic: 1.15,
 };
 
 const DEFAULT_CTR = 0.02;
@@ -81,6 +94,25 @@ export function normaliseInputs(inputs: ScenarioInputs): ScenarioInputs {
     ),
     average_order_value: positive(inputs.average_order_value),
     gross_margin_pct: normaliseRate(inputs.gross_margin_pct),
+    campaign_channel: inputs.campaign_channel?.trim() || "Mixed channels",
+    target_market: inputs.target_market?.trim() || "",
+    assumption_basis: inputs.assumption_basis?.trim() || "Consultant assumption",
+    assumption_date: inputs.assumption_date || "",
+    assumption_notes: inputs.assumption_notes?.trim() || "",
+  };
+}
+
+export function adjustedConversionRates(
+  rawInputs: ScenarioInputs,
+  multiplier = 1,
+): AdjustedConversionRates {
+  const inputs = normaliseInputs(rawInputs);
+  const adjust = (rate: number) => Math.min(1, rate * multiplier);
+  return {
+    click_to_lead: adjust(inputs.conv_rate_click_to_lead),
+    lead_to_cta: adjust(inputs.conv_rate_lead_to_cta),
+    cta_to_next_step: adjust(inputs.conv_rate_cta_to_next_step),
+    next_step_to_closed: adjust(inputs.conv_rate_next_step_to_closed),
   };
 }
 
@@ -89,15 +121,13 @@ export function calculateScenario(
   multiplier = 1,
 ): ScenarioResults {
   const inputs = normaliseInputs(rawInputs);
-  const effectiveRate = (rate: number) => Math.min(1, rate * multiplier);
+  const rates = adjustedConversionRates(inputs, multiplier);
   const clicks = inputs.cpc > 0 ? inputs.ad_budget / inputs.cpc : 0;
   const impressions = inputs.ctr > 0 ? clicks / inputs.ctr : 0;
-  const leads = clicks * effectiveRate(inputs.conv_rate_click_to_lead);
-  const ctaActions = leads * effectiveRate(inputs.conv_rate_lead_to_cta);
-  const nextStepOffers =
-    ctaActions * effectiveRate(inputs.conv_rate_cta_to_next_step);
-  const closedSales =
-    nextStepOffers * effectiveRate(inputs.conv_rate_next_step_to_closed);
+  const leads = clicks * rates.click_to_lead;
+  const ctaActions = leads * rates.lead_to_cta;
+  const nextStepOffers = ctaActions * rates.cta_to_next_step;
+  const closedSales = nextStepOffers * rates.next_step_to_closed;
   const revenue = closedSales * inputs.average_order_value;
   const grossProfit = revenue * inputs.gross_margin_pct;
   const totalCampaignCost = inputs.ad_budget + inputs.management_fee;
@@ -137,6 +167,11 @@ export function calculateAll(rawInputs: ScenarioInputs): CalculationResponse {
     inputs,
     results,
     bottleneck: detectBottleneck(results.expected, inputs.core_cta_action),
+    adjusted_rates: {
+      conservative: adjustedConversionRates(inputs, DEFAULT_MULTIPLIERS.conservative),
+      expected: adjustedConversionRates(inputs, DEFAULT_MULTIPLIERS.expected),
+      optimistic: adjustedConversionRates(inputs, DEFAULT_MULTIPLIERS.optimistic),
+    },
   };
 }
 

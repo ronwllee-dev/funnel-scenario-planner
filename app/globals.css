@@ -12,7 +12,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -26,7 +27,8 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   color: #eef5f2;
   background: #0e1a1e;
 }
@@ -282,13 +284,43 @@ select {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   border: 1px solid #2d444b;
   border-radius: 6px;
   font-size: 1rem;
   min-height: 2.75rem;
   padding: 0 0.7rem;
   width: 100%;
+}
+
+.field textarea {
+  min-height: 7rem;
+  padding-bottom: 0.7rem;
+  padding-top: 0.7rem;
+  resize: vertical;
+}
+
+.assumption-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.assumption-section + .assumption-section {
+  border-top: 1px solid #2b4149;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+.assumption-section h2 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.assumption-section > div:first-child > p {
+  color: #adbbb5;
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
 }
 
 .field small {
@@ -349,6 +381,68 @@ select {
   font-size: 0.98rem;
   font-weight: 700;
   overflow-wrap: anywhere;
+}
+
+.summary-cell-wide {
+  grid-column: 1 / -1;
+}
+
+.model-status-card h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-top: 0.3rem;
+}
+
+.model-status-card > p:last-child,
+.scenario-projection-note,
+.snapshot-sensitivity,
+.snapshot-explanation {
+  color: #adbbb5;
+  font-size: 0.82rem;
+  margin-top: 0.4rem;
+}
+
+.snapshot-sensitivity {
+  color: #cfe7dc;
+  font-weight: 700;
+}
+
+.snapshot-explanation {
+  margin-top: 0.15rem;
+}
+
+.adjusted-rates {
+  border-bottom: 1px solid #263a41;
+  border-top: 1px solid #263a41;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0;
+}
+
+.adjusted-rates summary {
+  color: #c9d7d2;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.adjusted-rates dl {
+  margin-top: 0.65rem;
+}
+
+.scenario-projection-note {
+  margin-bottom: 0;
+}
+
+.disclaimer h2 {
+  color: #eef5f2;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.disclaimer p {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  margin-top: 0.45rem;
 }
 
 .snapshot-card h3 {

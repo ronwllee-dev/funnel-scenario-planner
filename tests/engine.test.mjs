@@ -84,3 +84,96 @@ test("detects the biggest expected-stage drop with configurable CTA label", () =
   assert.equal(calculation.bottleneck.stage, "Lead -> Trial Started");
   assert.equal(calculation.bottleneck.drop_pct, 95);
 });
+
+const transparentInputs = {
+  name: "Transparent forecast",
+  currency_label: "SGD",
+  ad_budget: 4000,
+  management_fee: 600,
+  cpc: 2,
+  ctr: 0.04,
+  core_cta_action: "Booked Call",
+  conv_rate_click_to_lead: 0.4,
+  conv_rate_lead_to_cta: 0.25,
+  conv_rate_cta_to_next_step: 0.5,
+  conv_rate_next_step_to_closed: 0.2,
+  average_order_value: 3000,
+  gross_margin_pct: 0.7,
+  campaign_channel: "Meta Ads",
+  target_market: "Singapore SMEs",
+  assumption_basis: "Media buyer estimate",
+  assumption_date: "2026-07-12",
+  assumption_notes: "Planning estimate",
+};
+
+test("uses 85%, 100%, and 115% conversion sensitivities only", () => {
+  const calculation = engine.calculateAll(transparentInputs);
+  assert.deepEqual(engine.DEFAULT_MULTIPLIERS, {
+    conservative: 0.85,
+    expected: 1,
+    optimistic: 1.15,
+  });
+  assert.deepEqual(calculation.adjusted_rates.conservative, {
+    click_to_lead: 0.34,
+    lead_to_cta: 0.2125,
+    cta_to_next_step: 0.425,
+    next_step_to_closed: 0.17,
+  });
+  assert.deepEqual(calculation.adjusted_rates.expected, {
+    click_to_lead: 0.4,
+    lead_to_cta: 0.25,
+    cta_to_next_step: 0.5,
+    next_step_to_closed: 0.2,
+  });
+  assert.deepEqual(calculation.adjusted_rates.optimistic, {
+    click_to_lead: 0.45999999999999996,
+    lead_to_cta: 0.2875,
+    cta_to_next_step: 0.575,
+    next_step_to_closed: 0.22999999999999998,
+  });
+
+  for (const tier of ["conservative", "expected", "optimistic"]) {
+    assert.equal(calculation.results[tier].clicks, 2000);
+    assert.equal(calculation.results[tier].impressions, 50000);
+  }
+  assert.equal(calculation.inputs.ad_budget, 4000);
+  assert.equal(calculation.inputs.management_fee, 600);
+  assert.equal(calculation.inputs.cpc, 2);
+  assert.equal(calculation.inputs.ctr, 0.04);
+  assert.equal(calculation.inputs.average_order_value, 3000);
+  assert.equal(calculation.inputs.gross_margin_pct, 0.7);
+});
+
+test("caps adjusted conversion rates at 100%", () => {
+  const rates = engine.adjustedConversionRates(
+    { ...transparentInputs, conv_rate_click_to_lead: 0.95 },
+    1.15,
+  );
+  assert.equal(rates.click_to_lead, 1);
+});
+
+test("context metadata never changes calculation outputs", () => {
+  const baseline = engine.calculateAll(transparentInputs).results;
+  const variants = [
+    { campaign_channel: "Google Search" },
+    { target_market: "Malaysia" },
+    { assumption_basis: "Current campaign data" },
+    { assumption_date: "2026-08-01" },
+    { assumption_notes: "Updated context only" },
+  ];
+  for (const variant of variants) {
+    assert.deepEqual(engine.calculateAll({ ...transparentInputs, ...variant }).results, baseline);
+  }
+});
+
+test("protects every ratio and output from divide-by-zero", () => {
+  const result = engine.calculateScenario({
+    ...transparentInputs,
+    ad_budget: 0,
+    cpc: 0,
+    ctr: 0,
+  });
+  for (const value of Object.values(result)) {
+    assert.equal(Number.isFinite(value), true);
+  }
+});
