@@ -13,14 +13,14 @@ test("maps assumption bases to model statuses", () => {
   assert.equal(metadata.getModelStatus("Current campaign data"), "Calibrated");
 });
 
-test("applies compatibility defaults to legacy scenarios", () => {
+test("applies compatibility defaults without inventing a legacy assumption date", () => {
   assert.deepEqual(
     metadata.normaliseScenarioContext({ created_at: "2025-03-04T12:00:00Z" }),
     {
       campaign_channel: "Mixed channels",
       target_market: "",
       assumption_basis: "Consultant assumption",
-      assumption_date: "2025-03-04",
+      assumption_date: "",
       assumption_notes: "",
     },
   );

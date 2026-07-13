@@ -66,8 +66,7 @@ export function normaliseScenarioContext(record: {
     campaign_channel: record.campaign_channel ?? "Mixed channels",
     target_market: record.target_market ?? "",
     assumption_basis: record.assumption_basis ?? "Consultant assumption",
-    assumption_date:
-      record.assumption_date ?? record.created_at?.slice(0, 10) ?? localDate(),
+    assumption_date: record.assumption_date ?? "",
     assumption_notes: record.assumption_notes ?? "",
   };
 }
