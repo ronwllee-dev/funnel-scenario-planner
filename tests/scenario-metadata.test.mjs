@@ -37,6 +37,15 @@ test("preserves saved contextual metadata", () => {
   assert.deepEqual(metadata.normaliseScenarioContext(context), context);
 });
 
+test("converts blank assumption dates to database null", () => {
+  assert.equal(metadata.assumptionDateForDatabase(""), null);
+  assert.equal(metadata.assumptionDateForDatabase("   "), null);
+  assert.equal(
+    metadata.assumptionDateForDatabase("2026-07-13"),
+    "2026-07-13",
+  );
+});
+
 test("migration and store persist context without changing RLS", async () => {
   const migration = await readFile(new URL("../supabase/migrations/0003_scenario_context.sql", import.meta.url), "utf8");
   const store = await readFile(new URL("../lib/scenario-store.ts", import.meta.url), "utf8");
@@ -49,4 +58,26 @@ test("migration and store persist context without changing RLS", async () => {
   assert.match(store, /user_id: userId/);
   assert.match(store, /normaliseScenarioContext\(record\)/);
   assert.doesNotMatch(migration, /create policy|drop policy/);
+});
+
+test("repair migration additively covers every context column", async () => {
+  const migration = await readFile(
+    new URL(
+      "../supabase/migrations/0004_repair_scenario_context_columns.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  for (const column of [
+    "campaign_channel",
+    "target_market",
+    "assumption_basis",
+    "assumption_date",
+    "assumption_notes",
+  ]) {
+    assert.match(migration, new RegExp(`add column if not exists ${column}`));
+  }
+  assert.match(migration, /assumption_date date/);
+  assert.match(migration, /scenario_multipliers[\s\S]*::jsonb/);
+  assert.doesNotMatch(migration, /drop column|drop table|create policy|drop policy/);
 });

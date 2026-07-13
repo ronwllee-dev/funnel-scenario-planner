@@ -49,6 +49,11 @@ export function localDate(date = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
+export function assumptionDateForDatabase(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export function normaliseScenarioContext(record: {
   campaign_channel?: string | null;
   target_market?: string | null;

@@ -3,7 +3,10 @@ import {
   DEFAULT_MULTIPLIERS,
   type ScenarioInputs,
 } from "@/lib/engine";
-import { normaliseScenarioContext } from "@/lib/scenario-metadata";
+import {
+  assumptionDateForDatabase,
+  normaliseScenarioContext,
+} from "@/lib/scenario-metadata";
 import { demoScenarios, type ScenarioRecord } from "@/lib/demo-scenarios";
 import { createClient } from "@/lib/supabase/server";
 import { ownedScenarioFilter } from "@/lib/scenario-access";
@@ -40,6 +43,7 @@ export async function saveScenario(inputs: ScenarioInputs, userId: string) {
     .from("scenarios")
     .insert({
       ...computed.inputs,
+      assumption_date: assumptionDateForDatabase(computed.inputs.assumption_date),
       user_id: userId,
       scenario_multipliers: DEFAULT_MULTIPLIERS,
       computed_results: computed.results,
@@ -60,6 +64,7 @@ export async function updateScenario(id: string, inputs: ScenarioInputs) {
     .from("scenarios")
     .update({
       ...computed.inputs,
+      assumption_date: assumptionDateForDatabase(computed.inputs.assumption_date),
       scenario_multipliers: DEFAULT_MULTIPLIERS,
       computed_results: computed.results,
       bottleneck_stage: computed.bottleneck.stage,
